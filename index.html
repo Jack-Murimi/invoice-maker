@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Receipt & Invoice Maker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+:root {
+  --bg: #f4f6f8;
+  --card: #ffffff;
+  --border: #e2e8f0;
+  --text: #1e293b;
+  --muted: #64748b;
+  --primary: #0f172a;
+  --primary-hover: #334155;
+  --accent: #2563eb;
+  --danger: #ef4444;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.4;
+  padding: 1rem;
+}
+.app-layout {
+  display: grid;
+  grid-template-columns: 460px 1fr;
+  gap: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+@media (max-width: 960px) {
+  .app-layout { grid-template-columns: 1fr; }
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+h2 { font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--primary); }
+label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 0.25rem; }
+input, textarea, select {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  margin-bottom: 0.75rem;
+}
+input:focus, textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.item-row {
+  display: grid;
+  grid-template-columns: 1.8fr 0.8fr 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.item-row input { margin-bottom: 0; }
+.btn {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+.btn:hover { background: var(--primary-hover); }
+.btn-sm { padding: 0.35rem 0.6rem; font-size: 0.75rem; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+.btn-outline:hover { background: #f1f5f9; }
+.btn-danger { background: transparent; color: var(--danger); border: 1px solid #fee2e2; }
+.btn-danger:hover { background: #fee2e2; }
+.btn-accent { background: var(--accent); }
+.btn-accent:hover { filter: brightness(0.9); }
+
+.preview-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1.25rem;
+  margin-bottom: 1rem;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.format-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.format-toggle button {
+  border: none;
+  padding: 0.45rem 0.85rem;
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.format-toggle button.active {
+  background: var(--primary);
+  color: #fff;
+}
+.preview-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 80vh;
+  overflow-x: auto;
+  padding: 1rem;
+  background: #cbd5e1;
+  border-radius: 8px;
+}
+
+/* Receipt / Invoice Print Sheet Styles */
+.sheet {
+  background: #fff;
+  color: #000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-sizing: border-box;
+}
+
+/* A4 Sheet */
+.sheet-a4 {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 18mm 16mm;
+  font-size: 13px;
+  line-height: 1.5;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.sheet-a4 .invoice-title {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  text-transform: uppercase;
+  margin-bottom: 1.5rem;
+  color: #0f172a;
+  border-bottom: 3px solid #0f172a;
+  padding-bottom: 0.5rem;
+}
+.sheet-a4 .meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  background: #f8fafc;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+}
+.sheet-a4 .meta-block h4 {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+.sheet-a4 .meta-block p {
+  white-space: pre-wrap;
+  font-weight: 600;
+  color: #0f172a;
+}
+.sheet-a4 table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1.5rem;
+}
+.sheet-a4 th {
+  background: #0f172a;
+  color: #fff;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 8px 10px;
+  text-align: left;
+}
+.sheet-a4 th.text-right, .sheet-a4 td.text-right { text-align: right; }
+.sheet-a4 td {
+  padding: 10px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: top;
+}
+.sheet-a4 tr:nth-child(even) td { background: #fbfcfe; }
+.sheet-a4 .totals-area {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+.sheet-a4 .totals-table {
+  width: 320px;
+  border-collapse: collapse;
+}
+.sheet-a4 .totals-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.sheet-a4 .grand-total-row td {
+  border-top: 2px solid #0f172a;
+  border-bottom: 2px solid #0f172a;
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+/* 79mm Thermal Sheet */
+.sheet-79mm {
+  width: 79mm;
+  padding: 4mm 3mm;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #000;
+}
+.sheet-79mm .receipt-header {
+  text-align: center;
+  margin-bottom: 6px;
+}
+.sheet-79mm .receipt-title {
+  font-size: 15px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.sheet-79mm .divider {
+  border-top: 1px dashed #000;
+  margin: 6px 0;
+}
+.sheet-79mm .meta-section {
+  font-size: 10.5px;
+  margin-bottom: 4px;
+}
+.sheet-79mm .meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+}
+.sheet-79mm .items-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10.5px;
+}
+.sheet-79mm .items-table th {
+  text-align: left;
+  border-bottom: 1px dashed #000;
+  padding: 3px 0;
+  font-weight: 700;
+}
+.sheet-79mm .items-table td {
+  padding: 3px 0;
+  vertical-align: top;
+}
+.sheet-79mm .text-right { text-align: right; }
+.sheet-79mm .item-transport-note {
+  font-size: 9.5px;
+  color: #333;
+}
+.sheet-79mm .totals-block {
+  margin-top: 4px;
+  font-size: 11px;
+}
+.sheet-79mm .totals-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+.sheet-79mm .totals-row.grand {
+  font-size: 13px;
+  font-weight: 900;
+  border-top: 1px dashed #000;
+  border-bottom: 1px dashed #000;
+  padding: 4px 0;
+  margin-top: 4px;
+}
+.sheet-79mm .footer-note {
+  text-align: center;
+  font-size: 9.5px;
+  margin-top: 8px;
+}
+
+/* Screen vs Print handling */
+@media print {
+  body {
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .no-print, .editor-panel, .preview-toolbar {
+    display: none !important;
+  }
+  .app-layout {
+    display: block !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+  .preview-container {
+    background: transparent !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+  .sheet {
+    box-shadow: none !important;
+    margin: 0 auto !important;
+    page-break-inside: avoid !important;
+  }
+}
+</style>
+<style id="dynamic-print-page"></style>
+</head>
+<body>
+
+<div class="app-layout">
+  <!-- Editor Panel -->
+  <div class="card editor-panel no-print">
+    <h2>Receipt & Invoice Details</h2>
+    
+    <label>From (Supplier)</label>
+    <textarea id="inputFrom" rows="2" placeholder="Acme Logistics & Supplies&#10;123 Harbor St, Dock 4">Acme Trading Co.
+Port Terminal 1</textarea>
+
+    <label>To (Customer)</label>
+    <textarea id="inputTo" rows="2" placeholder="Metro Retail Store&#10;Attn: Receiving Dept">Metro Central Mart
+Attn: Receiving Dept</textarea>
+
+    <div class="form-row">
+      <div>
+        <label>Date</label>
+        <input type="date" id="inputDate">
+      </div>
+      <div>
+        <label>Currency</label>
+        <input type="text" id="inputCurrency" value="$" maxlength="5">
+      </div>
+    </div>
+
+    <label>Transport / Delivery Fee (Total to Distribute)</label>
+    <input type="number" id="inputTransport" step="0.01" min="0" value="50.00" placeholder="0.00">
+
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.5rem; margin-top: 0.5rem;">
+      <h2>Line Items</h2>
+      <button class="btn btn-sm btn-outline" id="btnAddItem">+ Add Item</button>
+    </div>
+
+    <div id="itemsContainer"></div>
+
+    <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+      <div style="display:flex; justify-content:space-between; font-size: 0.85rem; margin-bottom: 0.25rem;">
+        <span style="color:var(--muted)">Items Subtotal:</span>
+        <strong id="summarySubtotal">$0.00</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size: 0.85rem; margin-bottom: 0.25rem;">
+        <span style="color:var(--muted)">Transport Fee:</span>
+        <strong id="summaryTransport">$0.00</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size: 1rem; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed var(--border);">
+        <span>Grand Total:</span>
+        <strong id="summaryGrand" style="color:var(--accent);">$0.00</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preview & Print Area -->
+  <div>
+    <div class="preview-toolbar no-print">
+      <div class="format-toggle">
+        <button id="btnFormatA4" class="active" onclick="setFormat('a4')">A4 Invoice</button>
+        <button id="btnFormat79" onclick="setFormat('79mm')">79mm Thermal</button>
+      </div>
+
+      <div style="display:flex; gap: 0.5rem;">
+        <button class="btn btn-outline" onclick="triggerPrint()">Print</button>
+        <button class="btn btn-accent" onclick="downloadPdf()">Download PDF</button>
+      </div>
+    </div>
+
+    <div class="preview-container">
+      <div id="printSheet" class="sheet sheet-a4">
+        <!-- Injected via renderSheet() -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ponytail: single file app; storage ceiling is localStorage; upgrade to server API when multi-user/sync needed.
+const state = {
+  format: 'a4', // 'a4' or '79mm'
+  from: '',
+  to: '',
+  date: '',
+  currency: '$',
+  transportFee: 50.0,
+  items: [
+    { name: 'Industrial Motor 5HP', qty: 2, price: 400.00 },
+    { name: 'Steel Bearings pack (10x)', qty: 5, price: 30.00 },
+    { name: 'Synthetic Gear Oil 5L', qty: 1, price: 50.00 }
+  ]
+};
+
+function init() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('inputDate').value = today;
+  state.date = today;
+  loadFromStorage();
+  syncInputs();
+  bindEvents();
+  render();
+}
+
+function saveToStorage() {
+  try {
+    localStorage.setItem('receipt_maker_state', JSON.stringify({
+      from: document.getElementById('inputFrom').value,
+      to: document.getElementById('inputTo').value,
+      date: document.getElementById('inputDate').value,
+      currency: document.getElementById('inputCurrency').value,
+      transportFee: parseFloat(document.getElementById('inputTransport').value) || 0,
+      items: state.items
+    }));
+  } catch (e) {}
+}
+
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem('receipt_maker_state');
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (data.from !== undefined) document.getElementById('inputFrom').value = data.from;
+    if (data.to !== undefined) document.getElementById('inputTo').value = data.to;
+    if (data.date !== undefined) document.getElementById('inputDate').value = data.date;
+    if (data.currency !== undefined) document.getElementById('inputCurrency').value = data.currency;
+    if (data.transportFee !== undefined) document.getElementById('inputTransport').value = data.transportFee;
+    if (Array.isArray(data.items) && data.items.length) state.items = data.items;
+  } catch (e) {}
+}
+
+function syncInputs() {
+  state.from = document.getElementById('inputFrom').value;
+  state.to = document.getElementById('inputTo').value;
+  state.date = document.getElementById('inputDate').value;
+  state.currency = document.getElementById('inputCurrency').value || '$';
+  state.transportFee = parseFloat(document.getElementById('inputTransport').value) || 0;
+}
+
+function bindEvents() {
+  ['inputFrom', 'inputTo', 'inputDate', 'inputCurrency', 'inputTransport'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      syncInputs();
+      saveToStorage();
+      render();
+    });
+  });
+
+  document.getElementById('btnAddItem').addEventListener('click', () => {
+    state.items.push({ name: '', qty: 1, price: 0 });
+    saveToStorage();
+    render();
+  });
+}
+
+function deleteItem(index) {
+  state.items.splice(index, 1);
+  if (state.items.length === 0) state.items.push({ name: '', qty: 1, price: 0 });
+  saveToStorage();
+  render();
+}
+
+function updateItem(index, field, value) {
+  if (field === 'qty') state.items[index].qty = Math.max(0, parseFloat(value) || 0);
+  else if (field === 'price') state.items[index].price = Math.max(0, parseFloat(value) || 0);
+  else state.items[index].name = value;
+  saveToStorage();
+  render();
+}
+
+function calculateAllocations() {
+  const lineSubtotals = state.items.map(i => (i.qty || 0) * (i.price || 0));
+  const totalSubtotal = lineSubtotals.reduce((a, b) => a + b, 0);
+  const fee = state.transportFee || 0;
+
+  return state.items.map((item, idx) => {
+    const lineSubtotal = lineSubtotals[idx];
+    const transportShare = totalSubtotal > 0 ? (lineSubtotal / totalSubtotal) * fee : (fee / (state.items.length || 1));
+    const effectiveTotal = lineSubtotal + transportShare;
+    const effectiveUnitCost = item.qty > 0 ? effectiveTotal / item.qty : 0;
+    return {
+      ...item,
+      lineSubtotal,
+      transportShare,
+      effectiveTotal,
+      effectiveUnitCost
+    };
+  });
+}
+
+function setFormat(fmt) {
+  state.format = fmt;
+  document.getElementById('btnFormatA4').classList.toggle('active', fmt === 'a4');
+  document.getElementById('btnFormat79').classList.toggle('active', fmt === '79mm');
+  updatePrintPageStyle();
+  renderSheet();
+}
+
+function updatePrintPageStyle() {
+  const styleEl = document.getElementById('dynamic-print-page');
+  if (state.format === '79mm') {
+    // 79mm thermal continuous roll: zero page breaks, exact width
+    styleEl.textContent = `
+      @page {
+        size: 79mm auto;
+        margin: 2mm 2.5mm;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .sheet-79mm {
+        width: 100% !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+      }
+    `;
+  } else {
+    // A4 standard portrait
+    styleEl.textContent = `
+      @page {
+        size: A4 portrait;
+        margin: 12mm 10mm;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .sheet-a4 {
+        width: 100% !important;
+        min-height: auto !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+      }
+    `;
+  }
+}
+
+function formatMoney(amount) {
+  return `${state.currency}${Number(amount || 0).toFixed(2)}`;
+}
+
+function renderEditorItems() {
+  const container = document.getElementById('itemsContainer');
+  container.innerHTML = '';
+
+  state.items.forEach((item, index) => {
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.innerHTML = `
+      <input type="text" placeholder="Item name / desc" value="${escapeHtml(item.name)}" oninput="updateItem(${index}, 'name', this.value)">
+      <input type="number" min="0" step="any" placeholder="Qty" value="${item.qty}" oninput="updateItem(${index}, 'qty', this.value)">
+      <input type="number" min="0" step="0.01" placeholder="Price" value="${item.price}" oninput="updateItem(${index}, 'price', this.value)">
+      <button class="btn btn-danger btn-sm" title="Remove" onclick="deleteItem(${index})">&times;</button>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function renderSheet() {
+  const sheet = document.getElementById('printSheet');
+  const computed = calculateAllocations();
+  const subtotal = computed.reduce((acc, i) => acc + i.lineSubtotal, 0);
+  const grandTotal = subtotal + state.transportFee;
+
+  // Update summary sidebar
+  document.getElementById('summarySubtotal').textContent = formatMoney(subtotal);
+  document.getElementById('summaryTransport').textContent = formatMoney(state.transportFee);
+  document.getElementById('summaryGrand').textContent = formatMoney(grandTotal);
+
+  if (state.format === '79mm') {
+    sheet.className = 'sheet sheet-79mm';
+    sheet.innerHTML = `
+      <div class="receipt-header">
+        <div class="receipt-title">RECEIPT</div>
+        <div style="font-size:10px; margin-top:2px;">${escapeHtml(state.from.split('\\n')[0] || '')}</div>
+      </div>
+      <div class="divider"></div>
+      <div class="meta-section">
+        <div class="meta-row"><span>DATE:</span><span>${escapeHtml(state.date)}</span></div>
+        <div class="meta-row"><span>FROM:</span><span style="text-align:right;">${escapeHtml(state.from).replace(/\\n/g, '<br>')}</span></div>
+        <div class="meta-row"><span>TO:</span><span style="text-align:right;">${escapeHtml(state.to).replace(/\\n/g, '<br>')}</span></div>
+      </div>
+      <div class="divider"></div>
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>ITEM</th>
+            <th class="text-right">QTY</th>
+            <th class="text-right">PRICE</th>
+            <th class="text-right">TOTAL</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${computed.map(i => `
+            <tr>
+              <td colspan="4" style="font-weight:700; padding-top:4px;">${escapeHtml(i.name || 'Item')}</td>
+            </tr>
+            <tr>
+              <td class="item-transport-note">+tr: ${formatMoney(i.transportShare)}</td>
+              <td class="text-right">${i.qty}</td>
+              <td class="text-right">${formatMoney(i.price)}</td>
+              <td class="text-right" style="font-weight:700;">${formatMoney(i.effectiveTotal)}</td>
+            </tr>
+            <tr>
+              <td colspan="4" class="item-transport-note" style="border-bottom:1px dotted #ccc; padding-bottom:3px;">
+                Eff. unit cost: ${formatMoney(i.effectiveUnitCost)}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      <div class="divider"></div>
+      <div class="totals-block">
+        <div class="totals-row">
+          <span>Items Subtotal:</span>
+          <span>${formatMoney(subtotal)}</span>
+        </div>
+        <div class="totals-row">
+          <span>Transport Fee:</span>
+          <span>${formatMoney(state.transportFee)}</span>
+        </div>
+        <div class="totals-row grand">
+          <span>TOTAL:</span>
+          <span>${formatMoney(grandTotal)}</span>
+        </div>
+      </div>
+      <div class="footer-note">*** THANK YOU ***</div>
+    `;
+  } else {
+    sheet.className = 'sheet sheet-a4';
+    sheet.innerHTML = `
+      <div class="invoice-title">INVOICE</div>
+      <div class="meta-grid">
+        <div class="meta-block">
+          <h4>From (Supplier)</h4>
+          <p>${escapeHtml(state.from)}</p>
+        </div>
+        <div class="meta-block">
+          <h4>To (Customer)</h4>
+          <p>${escapeHtml(state.to)}</p>
+        </div>
+        <div class="meta-block">
+          <h4>Date</h4>
+          <p>${escapeHtml(state.date)}</p>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 32%;">Item Description</th>
+            <th class="text-right" style="width: 10%;">Qty</th>
+            <th class="text-right" style="width: 14%;">Unit Price</th>
+            <th class="text-right" style="width: 14%;">Subtotal</th>
+            <th class="text-right" style="width: 15%;">Transport Share</th>
+            <th class="text-right" style="width: 15%;">Line Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${computed.map(i => `
+            <tr>
+              <td>
+                <strong>${escapeHtml(i.name || 'Item')}</strong>
+                <div style="font-size:11px; color:#64748b;">Eff. unit cost: ${formatMoney(i.effectiveUnitCost)}</div>
+              </td>
+              <td class="text-right">${i.qty}</td>
+              <td class="text-right">${formatMoney(i.price)}</td>
+              <td class="text-right">${formatMoney(i.lineSubtotal)}</td>
+              <td class="text-right" style="color:#2563eb;">+${formatMoney(i.transportShare)}</td>
+              <td class="text-right"><strong>${formatMoney(i.effectiveTotal)}</strong></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+
+      <div class="totals-area">
+        <table class="totals-table">
+          <tr>
+            <td>Items Subtotal:</td>
+            <td class="text-right"><strong>${formatMoney(subtotal)}</strong></td>
+          </tr>
+          <tr>
+            <td>Transport Fee (Allocated):</td>
+            <td class="text-right"><strong>${formatMoney(state.transportFee)}</strong></td>
+          </tr>
+          <tr class="grand-total-row">
+            <td>Grand Total:</td>
+            <td class="text-right">${formatMoney(grandTotal)}</td>
+          </tr>
+        </table>
+      </div>
+    `;
+  }
+}
+
+function render() {
+  renderEditorItems();
+  updatePrintPageStyle();
+  renderSheet();
+}
+
+function triggerPrint() {
+  updatePrintPageStyle();
+  window.print();
+}
+
+function downloadPdf() {
+  const sheet = document.getElementById('printSheet');
+  const isThermal = state.format === '79mm';
+  
+  const opt = {
+    margin: isThermal ? [2, 2, 2, 2] : [10, 10, 10, 10],
+    filename: `invoice-${state.date}-${state.format}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: {
+      unit: 'mm',
+      format: isThermal ? [79, Math.max(120, sheet.offsetHeight * 0.264583 + 10)] : 'a4',
+      orientation: 'portrait'
+    }
+  };
+
+  html2pdf().set(opt).from(sheet).save();
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+init();
+</script>
+</body>
+</html>
