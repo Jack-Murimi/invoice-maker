@@ -481,87 +481,103 @@ body {
 /* ── 79mm Thermal Sheet ───────────────────────────────────── */
 .sheet-79mm {
   width: 79mm;
-  /* 3mm left/right margins, 4mm top/bottom — narrow but not cramped */
+  /* 3mm side margins → 73mm printable; 4mm top, 6mm bottom */
   padding: 4mm 3mm 6mm 3mm;
   font-family: 'Courier New', Courier, monospace;
-  font-size: 9pt;
-  line-height: 1.3;
+  font-size: 8.5pt;
+  line-height: 1.35;
   color: #000;
+  /* prevent ANY child from escaping the roll width */
+  overflow: hidden;
+  word-break: break-word;
 }
 
 .th-center { text-align: center; }
 .th-logo {
-  font-size: 14pt;
+  font-size: 13pt;
   font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: 2px;
+  letter-spacing: 1.5px;
   margin-bottom: 2px;
+  word-break: break-all;
 }
 .th-sub {
-  font-size: 7.5pt;
-  letter-spacing: 0.5px;
+  font-size: 7pt;
+  letter-spacing: 0.3px;
   margin-bottom: 1mm;
 }
 
-.th-hr-solid { border: none; border-top: 1px solid #000; margin: 2.5mm 0; }
-.th-hr-dash  { border: none; border-top: 1px dashed #000; margin: 2mm 0; }
+.th-hr-solid { border: none; border-top: 1px solid #000; margin: 2mm 0; }
+.th-hr-dash  { border: none; border-top: 1px dashed #000; margin: 1.5mm 0; }
 
-.th-meta { font-size: 8.5pt; margin-bottom: 1mm; }
+.th-meta { font-size: 8pt; margin-bottom: 1mm; }
 .th-meta-row {
   display: flex;
   gap: 3px;
-  line-height: 1.45;
+  line-height: 1.4;
 }
-.th-meta-row .lbl { flex-shrink: 0; font-weight: 700; width: 38px; }
-.th-meta-row .val { word-break: break-word; }
+.th-meta-row .lbl { flex-shrink: 0; font-weight: 700; width: 34px; }
+.th-meta-row .val { flex: 1; min-width: 0; word-break: break-word; }
 
-/* Thermal items — monospace column layout */
-.th-items { width: 100%; font-size: 8.5pt; }
-.th-items-head {
-  display: flex;
+/* ── Thermal items table ─────────────────────────────────────
+   Layout: item name wraps freely; qty, price, total are
+   right-aligned in fixed-width columns that fit KSh values.
+   73mm usable = ~207px at 96dpi.
+   Name: flex remainder  Qty: 22px  Total: 68px
+   Second row: price detail + transport, full width
+   ─────────────────────────────────────────────────────────── */
+.th-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 8pt;
+  table-layout: fixed;
+}
+.th-tbl .col-name  { width: auto; }
+.th-tbl .col-qty   { width: 22px;  text-align: right; white-space: nowrap; }
+.th-tbl .col-total { width: 72px; text-align: right; white-space: nowrap; font-weight: 700; }
+
+.th-tbl thead th {
+  font-size: 7pt;
   font-weight: 700;
-  font-size: 7.5pt;
   text-transform: uppercase;
-  padding-bottom: 1mm;
+  letter-spacing: 0.3px;
+  padding: 0 2px 2px;
   border-bottom: 1px solid #000;
-  margin-bottom: 1mm;
 }
-.th-col-name  { flex: 1; min-width: 0; }
-.th-col-qty   { width: 18px; text-align: right; }
-.th-col-price { width: 30px; text-align: right; }
-.th-col-total { width: 36px; text-align: right; }
+.th-tbl thead th.col-name { text-align: left; }
 
-.th-item-block { margin-bottom: 2mm; }
-.th-item-main {
-  display: flex;
-  align-items: baseline;
-  gap: 2px;
+.th-tbl td {
+  padding: 2px 2px;
+  vertical-align: top;
 }
-.th-item-name {
-  flex: 1;
-  min-width: 0;
-  font-weight: 700;
-  word-break: break-word;
-  white-space: normal;
+/* item name cell — wraps, bold */
+.th-tbl .td-name { font-weight: 700; word-break: break-word; white-space: normal; }
+/* sub-row: unit price + transport note, spans all cols */
+.th-tbl .td-sub {
+  font-size: 7pt;
+  color: #333;
+  padding: 0 2px 3px;
+  border-bottom: 1px dotted #ccc;
 }
-.th-item-qty   { width: 18px; text-align: right; }
-.th-item-price { width: 30px; text-align: right; }
-.th-item-total { width: 36px; text-align: right; font-weight: 700; }
-.th-item-meta  { font-size: 7pt; color: #333; padding-left: 0; line-height: 1.4; }
+/* separator row between items */
+.th-tbl .tr-sep td { padding: 0; height: 1px; }
 
-.th-totals { font-size: 8.5pt; }
-.th-totals-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 1px 0;
+.th-totals-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 8.5pt;
+  margin-top: 1mm;
+  table-layout: fixed;
 }
-.th-totals-row.grand {
-  font-size: 11pt;
+.th-totals-tbl td { padding: 1.5px 2px; }
+.th-totals-tbl .td-label { text-align: left; }
+.th-totals-tbl .td-value { text-align: right; font-weight: 700; white-space: nowrap; }
+.th-totals-tbl .tr-grand td {
+  font-size: 10.5pt;
   font-weight: 900;
   border-top: 1px solid #000;
   border-bottom: 1px solid #000;
-  padding: 2mm 0;
-  margin: 1.5mm 0;
+  padding: 2mm 2px;
 }
 
 .th-footer {
@@ -874,7 +890,6 @@ function renderA4(sheet, rows, subtotal, grand) {
 /* ── Render 79mm thermal sheet ────────────────────────── */
 function render79(sheet, rows, subtotal, grand) {
   const fromRaw = get('inputFrom').split('\n');
-  const toRaw   = get('inputTo').split('\n');
   const date    = esc(get('inputDate'));
 
   sheet.className = 'sheet sheet-79mm';
@@ -893,41 +908,46 @@ function render79(sheet, rows, subtotal, grand) {
 
     <hr class="th-hr-dash">
 
-    <div class="th-items-head">
-      <span class="th-col-name">ITEM</span>
-      <span class="th-col-qty">QT</span>
-      <span class="th-col-price">PRICE</span>
-      <span class="th-col-total">TOTAL</span>
-    </div>
-
-    ${rows.map(r => `
-      <div class="th-item-block">
-        <div class="th-item-main">
-          <span class="th-item-name">${esc(r.name || 'Item')}</span>
-          <span class="th-item-qty">${r.qty}</span>
-          <span class="th-item-price">${fmt(r.price)}</span>
-          <span class="th-item-total">${fmt(r.eff)}</span>
-        </div>
-        <div class="th-item-meta">+trn: ${fmt(r.tr)} &nbsp;|&nbsp; eff/unit: ${fmt(r.effUnit)}</div>
-      </div>
-    `).join('')}
+    <table class="th-tbl">
+      <thead>
+        <tr>
+          <th class="col-name">Item</th>
+          <th class="col-qty">Qty</th>
+          <th class="col-total">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(r => `
+          <tr>
+            <td class="td-name col-name">${esc(r.name || 'Item')}</td>
+            <td class="col-qty">${r.qty}</td>
+            <td class="col-total">${fmt(r.eff)}</td>
+          </tr>
+          <tr>
+            <td class="td-sub" colspan="3">
+              @${fmt(r.price)} &nbsp;+trn:${fmt(r.tr)} &nbsp;eff/u:${fmt(r.effUnit)}
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
 
     <hr class="th-hr-solid">
 
-    <div class="th-totals">
-      <div class="th-totals-row">
-        <span>Items Subtotal</span>
-        <span>${fmt(subtotal)}</span>
-      </div>
-      <div class="th-totals-row">
-        <span>Transport Fee</span>
-        <span>${fmt(transportFee())}</span>
-      </div>
-      <div class="th-totals-row grand">
-        <span>TOTAL</span>
-        <span>${fmt(grand)}</span>
-      </div>
-    </div>
+    <table class="th-totals-tbl">
+      <tr>
+        <td class="td-label">Items Subtotal</td>
+        <td class="td-value">${fmt(subtotal)}</td>
+      </tr>
+      <tr>
+        <td class="td-label">Transport Fee</td>
+        <td class="td-value">${fmt(transportFee())}</td>
+      </tr>
+      <tr class="tr-grand">
+        <td class="td-label">TOTAL</td>
+        <td class="td-value">${fmt(grand)}</td>
+      </tr>
+    </table>
 
     <hr class="th-hr-dash">
     <div class="th-footer">** THANK YOU **</div>
