@@ -3,756 +3,1004 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Receipt & Invoice Maker</title>
+<title>Thermal Invoice Maker</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
+/* ── Design tokens ───────────────────────────────────────── */
 :root {
-  --bg: #f4f6f8;
-  --card: #ffffff;
-  --border: #e2e8f0;
-  --text: #1e293b;
-  --muted: #64748b;
-  --primary: #0f172a;
-  --primary-hover: #334155;
-  --accent: #2563eb;
-  --danger: #ef4444;
+  --bg:      #eef1f5;
+  --surface: #ffffff;
+  --border:  #d8dde6;
+  --text:    #1a202c;
+  --muted:   #718096;
+  --ink:     #0d1117;
+  --accent:  #1a56db;
+  --accent2: #e8f0fe;
+  --danger:  #e53e3e;
+  --radius:  6px;
+  --shadow:  0 1px 4px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
 }
-* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Reset ───────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
   background: var(--bg);
   color: var(--text);
-  line-height: 1.4;
-  padding: 1rem;
+  font-size: 14px;
+  line-height: 1.5;
 }
-.app-layout {
+
+/* ── App shell ───────────────────────────────────────────── */
+.app-header {
+  background: var(--ink);
+  color: #fff;
+  padding: 0 1.5rem;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.2px;
+  border-bottom: 1px solid #2d3748;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.app-header .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block; }
+
+.app-body {
   display: grid;
-  grid-template-columns: 460px 1fr;
-  gap: 1.5rem;
-  max-width: 1400px;
-  margin: 0 auto;
+  grid-template-columns: 400px 1fr;
+  height: calc(100vh - 52px);
 }
-@media (max-width: 960px) {
-  .app-layout { grid-template-columns: 1fr; }
+@media (max-width: 900px) {
+  .app-body { grid-template-columns: 1fr; height: auto; }
 }
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+
+/* ── Editor sidebar ──────────────────────────────────────── */
+.editor {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
   padding: 1.25rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
-h2 { font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--primary); }
-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 0.25rem; }
-input, textarea, select {
+
+.section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--muted);
+  padding: 0.6rem 0 0.4rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.section-title:first-child { padding-top: 0; }
+
+.field { margin-bottom: 0.75rem; }
+.field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.field input,
+.field textarea,
+.field select {
   width: 100%;
-  padding: 0.5rem 0.65rem;
+  padding: 0.45rem 0.6rem;
   border: 1px solid var(--border);
-  border-radius: 4px;
-  font-size: 0.875rem;
+  border-radius: var(--radius);
+  font-size: 13px;
   font-family: inherit;
-  margin-bottom: 0.75rem;
+  color: var(--text);
+  background: #fafbfc;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-input:focus, textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.field input:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(26,86,219,0.12);
+  background: #fff;
+}
+.field textarea { resize: vertical; }
+
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.form-row3 { display: grid; grid-template-columns: 1fr 0.55fr 0.55fr; gap: 0.6rem; }
+
+/* Items */
+.items-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0 0.5rem;
+  margin-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+.items-header span {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--muted);
+}
+
+.item-col-labels {
+  display: grid;
+  grid-template-columns: 1fr 56px 80px 30px;
+  gap: 4px;
+  padding: 0 0 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.item-col-labels span:nth-child(2),
+.item-col-labels span:nth-child(3) { text-align: center; }
+
 .item-row {
   display: grid;
-  grid-template-columns: 1.8fr 0.8fr 1fr auto;
-  gap: 0.5rem;
+  grid-template-columns: 1fr 56px 80px 30px;
+  gap: 4px;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 4px;
 }
-.item-row input { margin-bottom: 0; }
-.btn {
-  background: var(--primary);
-  color: #fff;
-  border: none;
-  padding: 0.5rem 0.85rem;
-  font-size: 0.85rem;
-  font-weight: 500;
+.item-row input {
+  width: 100%;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--border);
   border-radius: 4px;
-  cursor: pointer;
+  font-size: 12.5px;
+  font-family: inherit;
+  background: #fafbfc;
+}
+.item-row input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(26,86,219,0.1);
+  background: #fff;
+}
+.item-row input[type="number"] { text-align: right; }
+
+/* Buttons */
+.btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
+  gap: 5px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.45rem 0.85rem;
+  transition: background 0.12s, opacity 0.12s;
+  white-space: nowrap;
 }
-.btn:hover { background: var(--primary-hover); }
-.btn-sm { padding: 0.35rem 0.6rem; font-size: 0.75rem; }
-.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
-.btn-outline:hover { background: #f1f5f9; }
-.btn-danger { background: transparent; color: var(--danger); border: 1px solid #fee2e2; }
-.btn-danger:hover { background: #fee2e2; }
-.btn-accent { background: var(--accent); }
-.btn-accent:hover { filter: brightness(0.9); }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #1447c0; }
+.btn-ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover { background: #f0f4ff; border-color: var(--accent); color: var(--accent); }
+.btn-del {
+  background: transparent;
+  color: #c0c8d4;
+  border: none;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.btn-del:hover { color: var(--danger); background: #fff0f0; }
+.btn-add-item {
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  border-radius: var(--radius);
+  width: 100%;
+  padding: 0.4rem;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.btn-add-item:hover { border-color: var(--accent); color: var(--accent); }
 
-.preview-toolbar {
+/* Summary strip */
+.summary-strip {
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 2px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+}
+.summary-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 0.75rem 1.25rem;
-  margin-bottom: 1rem;
-  gap: 0.5rem;
+  color: var(--muted);
+}
+.summary-row strong { color: var(--text); }
+.summary-row.grand {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+}
+.summary-row.grand strong { color: var(--accent); font-size: 17px; }
+
+/* ── Preview panel ───────────────────────────────────────── */
+.preview-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.preview-toolbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0.6rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-shrink: 0;
   flex-wrap: wrap;
 }
-.format-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-.format-toggle button {
+
+.seg-control {
+  display: inline-flex;
+  background: #eef1f5;
+  border-radius: 6px;
+  padding: 3px;
+  gap: 2px;
+}
+.seg-control button {
   border: none;
-  padding: 0.45rem 0.85rem;
-  background: #fff;
-  font-size: 0.8rem;
+  background: transparent;
+  padding: 0.3rem 0.9rem;
+  font-size: 12px;
   font-weight: 600;
+  color: var(--muted);
+  border-radius: 4px;
   cursor: pointer;
+  transition: background 0.12s, color 0.12s;
 }
-.format-toggle button.active {
-  background: var(--primary);
-  color: #fff;
+.seg-control button.active {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
 }
-.preview-container {
+
+.toolbar-actions { display: flex; gap: 0.5rem; }
+
+.preview-canvas {
+  flex: 1;
+  overflow: auto;
+  background: #d1d9e6;
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  min-height: 80vh;
-  overflow-x: auto;
-  padding: 1rem;
-  background: #cbd5e1;
-  border-radius: 8px;
+  padding: 2rem;
 }
 
-/* Receipt / Invoice Print Sheet Styles */
+/* ══════════════════════════════════════════════════════════
+   DOCUMENT SHEETS (screen rendering)
+   ══════════════════════════════════════════════════════════ */
+
+/* ── A4 Sheet ─────────────────────────────────────────────── */
 .sheet {
   background: #fff;
-  color: #000;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  box-sizing: border-box;
+  box-shadow: var(--shadow);
+  position: relative;
 }
 
-/* A4 Sheet */
 .sheet-a4 {
   width: 210mm;
   min-height: 297mm;
-  padding: 18mm 16mm;
-  font-size: 13px;
-  line-height: 1.5;
-  font-family: Arial, Helvetica, sans-serif;
+  padding: 20mm 18mm 24mm 18mm;  /* standard A4: 20mm top/bottom, 18mm sides */
+  font-size: 11pt;
+  line-height: 1.55;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  color: #111827;
 }
-.sheet-a4 .invoice-title {
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  text-transform: uppercase;
-  margin-bottom: 1.5rem;
-  color: #0f172a;
-  border-bottom: 3px solid #0f172a;
-  padding-bottom: 0.5rem;
+
+/* Header accent bar */
+.a4-topbar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 6px;
+  background: linear-gradient(90deg, #1a56db 0%, #2dd4bf 100%);
 }
-.sheet-a4 .meta-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 1.5rem;
-  margin-bottom: 2rem;
-  background: #f8fafc;
-  padding: 1rem;
-  border: 1px solid #e2e8f0;
+
+.a4-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 9mm;
+  padding-top: 3mm;
 }
-.sheet-a4 .meta-block h4 {
-  font-size: 10px;
+.a4-header-left .a4-doc-type {
+  font-size: 28pt;
+  font-weight: 900;
+  letter-spacing: -1px;
+  color: #0d1117;
+  line-height: 1;
+}
+.a4-header-left .a4-doc-sub {
+  font-size: 8.5pt;
+  color: #6b7280;
+  margin-top: 3px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #64748b;
-  margin-bottom: 4px;
 }
-.sheet-a4 .meta-block p {
+.a4-date-badge {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 8px 14px;
+  text-align: right;
+  font-size: 8.5pt;
+  color: #4b5563;
+}
+.a4-date-badge strong {
+  display: block;
+  font-size: 11pt;
+  color: #0d1117;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.a4-parties {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6mm;
+  margin-bottom: 8mm;
+}
+.a4-party {
+  border-left: 3px solid #e5e7eb;
+  padding: 4px 0 4px 10px;
+}
+.a4-party.from { border-left-color: #1a56db; }
+.a4-party.to   { border-left-color: #2dd4bf; }
+.a4-party-label {
+  font-size: 7.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: #9ca3af;
+  margin-bottom: 2px;
+}
+.a4-party-name {
+  font-size: 10.5pt;
+  font-weight: 700;
   white-space: pre-wrap;
-  font-weight: 600;
-  color: #0f172a;
+  color: #111827;
+  line-height: 1.4;
 }
-.sheet-a4 table {
+
+/* A4 table */
+.a4-table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 1.5rem;
+  font-size: 9.5pt;
+  margin-bottom: 6mm;
 }
-.sheet-a4 th {
-  background: #0f172a;
+.a4-table thead tr {
+  background: #0d1117;
   color: #fff;
-  font-size: 11px;
+}
+.a4-table th {
+  padding: 7px 10px;
+  font-size: 7.5pt;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  padding: 8px 10px;
   text-align: left;
+  white-space: nowrap;
 }
-.sheet-a4 th.text-right, .sheet-a4 td.text-right { text-align: right; }
-.sheet-a4 td {
-  padding: 10px 10px;
-  border-bottom: 1px solid #e2e8f0;
-  vertical-align: top;
+.a4-table th.r { text-align: right; }
+.a4-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+  color: #1f2937;
 }
-.sheet-a4 tr:nth-child(even) td { background: #fbfcfe; }
-.sheet-a4 .totals-area {
+.a4-table td.r { text-align: right; }
+.a4-table tbody tr:nth-child(even) td { background: #f9fafb; }
+.a4-table tbody tr:hover td { background: #eff6ff; }
+.a4-table .item-name { font-weight: 600; color: #111827; }
+.a4-table .eff-unit {
+  font-size: 7.5pt;
+  color: #9ca3af;
+  margin-top: 1px;
+}
+.a4-table .transport-share { color: #1a56db; font-weight: 600; }
+.a4-table .line-total { font-weight: 700; color: #111827; }
+
+/* A4 totals */
+.a4-totals-wrap {
   display: flex;
   justify-content: flex-end;
-  margin-top: 1rem;
+  margin-bottom: 8mm;
 }
-.sheet-a4 .totals-table {
-  width: 320px;
-  border-collapse: collapse;
+.a4-totals {
+  width: 68mm;
 }
-.sheet-a4 .totals-table td {
-  padding: 6px 10px;
-  border-bottom: 1px solid #e2e8f0;
+.a4-totals-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 9.5pt;
+  color: #374151;
 }
-.sheet-a4 .grand-total-row td {
-  border-top: 2px solid #0f172a;
-  border-bottom: 2px solid #0f172a;
-  font-size: 16px;
-  font-weight: 800;
-  color: #0f172a;
+.a4-totals-row.grand {
+  border-bottom: none;
+  border-top: 2px solid #0d1117;
+  padding-top: 8px;
+  margin-top: 2px;
+  font-size: 13pt;
+  font-weight: 900;
+  color: #0d1117;
 }
 
-/* 79mm Thermal Sheet */
+.a4-footer {
+  position: absolute;
+  bottom: 10mm;
+  left: 18mm;
+  right: 18mm;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 4mm;
+  font-size: 7.5pt;
+  color: #9ca3af;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* ── 79mm Thermal Sheet ───────────────────────────────────── */
 .sheet-79mm {
   width: 79mm;
-  padding: 4mm 3mm;
+  /* 3mm left/right margins, 4mm top/bottom — narrow but not cramped */
+  padding: 4mm 3mm 6mm 3mm;
   font-family: 'Courier New', Courier, monospace;
-  font-size: 11px;
-  line-height: 1.35;
+  font-size: 9pt;
+  line-height: 1.3;
   color: #000;
 }
-.sheet-79mm .receipt-header {
-  text-align: center;
-  margin-bottom: 6px;
-}
-.sheet-79mm .receipt-title {
-  font-size: 15px;
+
+.th-center { text-align: center; }
+.th-logo {
+  font-size: 14pt;
   font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 2px;
+  margin-bottom: 2px;
 }
-.sheet-79mm .divider {
-  border-top: 1px dashed #000;
-  margin: 6px 0;
-}
-.sheet-79mm .meta-section {
-  font-size: 10.5px;
-  margin-bottom: 4px;
-}
-.sheet-79mm .meta-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 4px;
-}
-.sheet-79mm .items-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 10.5px;
-}
-.sheet-79mm .items-table th {
-  text-align: left;
-  border-bottom: 1px dashed #000;
-  padding: 3px 0;
-  font-weight: 700;
-}
-.sheet-79mm .items-table td {
-  padding: 3px 0;
-  vertical-align: top;
-}
-.sheet-79mm .text-right { text-align: right; }
-.sheet-79mm .item-transport-note {
-  font-size: 9.5px;
-  color: #333;
-}
-.sheet-79mm .totals-block {
-  margin-top: 4px;
-  font-size: 11px;
-}
-.sheet-79mm .totals-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 2px 0;
-}
-.sheet-79mm .totals-row.grand {
-  font-size: 13px;
-  font-weight: 900;
-  border-top: 1px dashed #000;
-  border-bottom: 1px dashed #000;
-  padding: 4px 0;
-  margin-top: 4px;
-}
-.sheet-79mm .footer-note {
-  text-align: center;
-  font-size: 9.5px;
-  margin-top: 8px;
+.th-sub {
+  font-size: 7.5pt;
+  letter-spacing: 0.5px;
+  margin-bottom: 1mm;
 }
 
-/* Screen vs Print handling */
+.th-hr-solid { border: none; border-top: 1px solid #000; margin: 2.5mm 0; }
+.th-hr-dash  { border: none; border-top: 1px dashed #000; margin: 2mm 0; }
+
+.th-meta { font-size: 8.5pt; margin-bottom: 1mm; }
+.th-meta-row {
+  display: flex;
+  gap: 3px;
+  line-height: 1.45;
+}
+.th-meta-row .lbl { flex-shrink: 0; font-weight: 700; width: 38px; }
+.th-meta-row .val { word-break: break-word; }
+
+/* Thermal items — monospace column layout */
+.th-items { width: 100%; font-size: 8.5pt; }
+.th-items-head {
+  display: flex;
+  font-weight: 700;
+  font-size: 7.5pt;
+  text-transform: uppercase;
+  padding-bottom: 1mm;
+  border-bottom: 1px solid #000;
+  margin-bottom: 1mm;
+}
+.th-col-name  { flex: 1; min-width: 0; }
+.th-col-qty   { width: 18px; text-align: right; }
+.th-col-price { width: 30px; text-align: right; }
+.th-col-total { width: 36px; text-align: right; }
+
+.th-item-block { margin-bottom: 2mm; }
+.th-item-main {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+.th-item-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  word-break: break-word;
+  white-space: normal;
+}
+.th-item-qty   { width: 18px; text-align: right; }
+.th-item-price { width: 30px; text-align: right; }
+.th-item-total { width: 36px; text-align: right; font-weight: 700; }
+.th-item-meta  { font-size: 7pt; color: #333; padding-left: 0; line-height: 1.4; }
+
+.th-totals { font-size: 8.5pt; }
+.th-totals-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 1px 0;
+}
+.th-totals-row.grand {
+  font-size: 11pt;
+  font-weight: 900;
+  border-top: 1px solid #000;
+  border-bottom: 1px solid #000;
+  padding: 2mm 0;
+  margin: 1.5mm 0;
+}
+
+.th-footer {
+  text-align: center;
+  font-size: 7.5pt;
+  margin-top: 3mm;
+  letter-spacing: 1px;
+}
+
+/* ══════════════════════════════════════════════════════════
+   PRINT STYLES
+   ══════════════════════════════════════════════════════════ */
 @media print {
-  body {
-    background: transparent !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }
-  .no-print, .editor-panel, .preview-toolbar {
-    display: none !important;
-  }
-  .app-layout {
-    display: block !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-  }
-  .preview-container {
+  body { background: transparent !important; }
+  .app-header, .editor, .preview-toolbar { display: none !important; }
+  .preview-panel { height: auto; overflow: visible; }
+  .preview-canvas {
     background: transparent !important;
     padding: 0 !important;
     display: block !important;
+    overflow: visible !important;
   }
-  .sheet {
-    box-shadow: none !important;
-    margin: 0 auto !important;
-    page-break-inside: avoid !important;
-  }
+  .sheet { box-shadow: none !important; margin: 0 !important; }
 }
 </style>
 <style id="dynamic-print-page"></style>
 </head>
 <body>
 
-<div class="app-layout">
-  <!-- Editor Panel -->
-  <div class="card editor-panel no-print">
-    <h2>Receipt & Invoice Details</h2>
-    
-    <label>From (Supplier)</label>
-    <textarea id="inputFrom" rows="2" placeholder="Acme Logistics & Supplies&#10;123 Harbor St, Dock 4">Acme Trading Co.
-Port Terminal 1</textarea>
+<header class="app-header no-print">
+  <span class="logo-dot"></span>
+  Thermal Invoice Maker
+</header>
 
-    <label>To (Customer)</label>
-    <textarea id="inputTo" rows="2" placeholder="Metro Retail Store&#10;Attn: Receiving Dept">Metro Central Mart
+<div class="app-body">
+
+  <!-- ── Editor sidebar ─────────────────────── -->
+  <aside class="editor no-print">
+
+    <p class="section-title">Parties</p>
+
+    <div class="field">
+      <label>From (Supplier)</label>
+      <textarea id="inputFrom" rows="2" placeholder="Supplier name&#10;Address / details">Acme Trading Co.
+Port Terminal 1</textarea>
+    </div>
+    <div class="field">
+      <label>To (Customer)</label>
+      <textarea id="inputTo" rows="2" placeholder="Customer name&#10;Address / details">Metro Central Mart
 Attn: Receiving Dept</textarea>
+    </div>
 
     <div class="form-row">
-      <div>
+      <div class="field">
         <label>Date</label>
         <input type="date" id="inputDate">
       </div>
-      <div>
-        <label>Currency</label>
-        <input type="text" id="inputCurrency" value="$" maxlength="5">
+      <div class="field">
+        <label>Currency Symbol</label>
+        <input type="text" id="inputCurrency" value="KSh" maxlength="5">
       </div>
     </div>
 
-    <label>Transport / Delivery Fee (Total to Distribute)</label>
-    <input type="number" id="inputTransport" step="0.01" min="0" value="50.00" placeholder="0.00">
+    <div class="field">
+      <label>Transport / Delivery Fee</label>
+        <input type="number" id="inputTransport" step="0.01" min="0" value="500.00" placeholder="0.00">
+    </div>
 
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.5rem; margin-top: 0.5rem;">
-      <h2>Line Items</h2>
-      <button class="btn btn-sm btn-outline" id="btnAddItem">+ Add Item</button>
+    <div class="items-header">
+      <span>Line Items</span>
+    </div>
+
+    <div class="item-col-labels">
+      <span>Description</span>
+      <span>Qty</span>
+      <span>Unit Price</span>
+      <span></span>
     </div>
 
     <div id="itemsContainer"></div>
+    <button class="btn-add-item" id="btnAddItem">+ Add Item</button>
 
-    <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
-      <div style="display:flex; justify-content:space-between; font-size: 0.85rem; margin-bottom: 0.25rem;">
-        <span style="color:var(--muted)">Items Subtotal:</span>
+    <div class="summary-strip">
+      <div class="summary-row">
+        <span>Items Subtotal</span>
         <strong id="summarySubtotal">$0.00</strong>
       </div>
-      <div style="display:flex; justify-content:space-between; font-size: 0.85rem; margin-bottom: 0.25rem;">
-        <span style="color:var(--muted)">Transport Fee:</span>
+      <div class="summary-row">
+        <span>Transport Fee</span>
         <strong id="summaryTransport">$0.00</strong>
       </div>
-      <div style="display:flex; justify-content:space-between; font-size: 1rem; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed var(--border);">
-        <span>Grand Total:</span>
-        <strong id="summaryGrand" style="color:var(--accent);">$0.00</strong>
+      <div class="summary-row grand">
+        <span>Grand Total</span>
+        <strong id="summaryGrand">$0.00</strong>
       </div>
     </div>
-  </div>
 
-  <!-- Preview & Print Area -->
-  <div>
+  </aside>
+
+  <!-- ── Preview panel ──────────────────────── -->
+  <div class="preview-panel">
+
     <div class="preview-toolbar no-print">
-      <div class="format-toggle">
+      <div class="seg-control">
         <button id="btnFormatA4" class="active" onclick="setFormat('a4')">A4 Invoice</button>
         <button id="btnFormat79" onclick="setFormat('79mm')">79mm Thermal</button>
       </div>
-
-      <div style="display:flex; gap: 0.5rem;">
-        <button class="btn btn-outline" onclick="triggerPrint()">Print</button>
-        <button class="btn btn-accent" onclick="downloadPdf()">Download PDF</button>
+      <div class="toolbar-actions">
+        <button class="btn btn-ghost" onclick="triggerPrint()">&#128438; Print</button>
+        <button class="btn btn-primary" onclick="downloadPdf()">&#8659; Download PDF</button>
       </div>
     </div>
 
-    <div class="preview-container">
-      <div id="printSheet" class="sheet sheet-a4">
-        <!-- Injected via renderSheet() -->
-      </div>
+    <div class="preview-canvas">
+      <div id="printSheet" class="sheet sheet-a4"></div>
     </div>
+
   </div>
 </div>
 
 <script>
-// ponytail: single file app; storage ceiling is localStorage; upgrade to server API when multi-user/sync needed.
+// ponytail: single-file; localStorage ceiling; upgrade to server API for multi-user.
 const state = {
-  format: 'a4', // 'a4' or '79mm'
-  from: '',
-  to: '',
-  date: '',
-  currency: '$',
-  transportFee: 50.0,
+  format: 'a4',
   items: [
-    { name: 'Industrial Motor 5HP', qty: 2, price: 400.00 },
-    { name: 'Steel Bearings pack (10x)', qty: 5, price: 30.00 },
-    { name: 'Synthetic Gear Oil 5L', qty: 1, price: 50.00 }
+    { name: 'Industrial Motor 5HP',      qty: 2, price: 45000.00 },
+    { name: 'Steel Bearings pack (10x)', qty: 5, price:  3200.00 },
+    { name: 'Synthetic Gear Oil 5L',     qty: 1, price:  5500.00 }
   ]
 };
 
+/* ── Init ─────────────────────────────────────────────── */
 function init() {
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('inputDate').value = today;
-  state.date = today;
+  document.getElementById('inputDate').value = new Date().toISOString().split('T')[0];
   loadFromStorage();
-  syncInputs();
   bindEvents();
   render();
 }
 
-function saveToStorage() {
+/* ── Storage ──────────────────────────────────────────── */
+function save() {
   try {
-    localStorage.setItem('receipt_maker_state', JSON.stringify({
-      from: document.getElementById('inputFrom').value,
-      to: document.getElementById('inputTo').value,
-      date: document.getElementById('inputDate').value,
-      currency: document.getElementById('inputCurrency').value,
-      transportFee: parseFloat(document.getElementById('inputTransport').value) || 0,
-      items: state.items
+    localStorage.setItem('rim_v2', JSON.stringify({
+      from:         document.getElementById('inputFrom').value,
+      to:           document.getElementById('inputTo').value,
+      date:         document.getElementById('inputDate').value,
+      currency:     document.getElementById('inputCurrency').value,
+      transportFee: document.getElementById('inputTransport').value,
+      items:        state.items
     }));
-  } catch (e) {}
+  } catch (_) {}
 }
-
 function loadFromStorage() {
   try {
-    const raw = localStorage.getItem('receipt_maker_state');
-    if (!raw) return;
-    const data = JSON.parse(raw);
-    if (data.from !== undefined) document.getElementById('inputFrom').value = data.from;
-    if (data.to !== undefined) document.getElementById('inputTo').value = data.to;
-    if (data.date !== undefined) document.getElementById('inputDate').value = data.date;
-    if (data.currency !== undefined) document.getElementById('inputCurrency').value = data.currency;
-    if (data.transportFee !== undefined) document.getElementById('inputTransport').value = data.transportFee;
-    if (Array.isArray(data.items) && data.items.length) state.items = data.items;
-  } catch (e) {}
+    const d = JSON.parse(localStorage.getItem('rim_v2') || 'null');
+    if (!d) return;
+    if (d.from)         document.getElementById('inputFrom').value = d.from;
+    if (d.to)           document.getElementById('inputTo').value = d.to;
+    if (d.date)         document.getElementById('inputDate').value = d.date;
+    if (d.currency)     document.getElementById('inputCurrency').value = d.currency;
+    if (d.transportFee !== undefined) document.getElementById('inputTransport').value = d.transportFee;
+    if (Array.isArray(d.items) && d.items.length) state.items = d.items;
+  } catch (_) {}
 }
 
-function syncInputs() {
-  state.from = document.getElementById('inputFrom').value;
-  state.to = document.getElementById('inputTo').value;
-  state.date = document.getElementById('inputDate').value;
-  state.currency = document.getElementById('inputCurrency').value || '$';
-  state.transportFee = parseFloat(document.getElementById('inputTransport').value) || 0;
-}
-
+/* ── Events ───────────────────────────────────────────── */
 function bindEvents() {
-  ['inputFrom', 'inputTo', 'inputDate', 'inputCurrency', 'inputTransport'].forEach(id => {
-    document.getElementById(id).addEventListener('input', () => {
-      syncInputs();
-      saveToStorage();
-      render();
-    });
-  });
-
+  ['inputFrom','inputTo','inputDate','inputCurrency','inputTransport'].forEach(id =>
+    document.getElementById(id).addEventListener('input', () => { save(); render(); })
+  );
   document.getElementById('btnAddItem').addEventListener('click', () => {
     state.items.push({ name: '', qty: 1, price: 0 });
-    saveToStorage();
-    render();
+    save(); render();
   });
 }
-
-function deleteItem(index) {
-  state.items.splice(index, 1);
-  if (state.items.length === 0) state.items.push({ name: '', qty: 1, price: 0 });
-  saveToStorage();
-  render();
+function deleteItem(i) {
+  state.items.splice(i, 1);
+  if (!state.items.length) state.items.push({ name: '', qty: 1, price: 0 });
+  save(); render();
+}
+function updateItem(i, field, val) {
+  if (field === 'qty')   state.items[i].qty   = Math.max(0, parseFloat(val) || 0);
+  else if (field === 'price') state.items[i].price = Math.max(0, parseFloat(val) || 0);
+  else state.items[i].name = val;
+  save(); render();
 }
 
-function updateItem(index, field, value) {
-  if (field === 'qty') state.items[index].qty = Math.max(0, parseFloat(value) || 0);
-  else if (field === 'price') state.items[index].price = Math.max(0, parseFloat(value) || 0);
-  else state.items[index].name = value;
-  saveToStorage();
-  render();
-}
+/* ── Calculations ─────────────────────────────────────── */
+function get(id) { return document.getElementById(id).value; }
+function currency() { return get('inputCurrency') || '$'; }
+function transportFee() { return parseFloat(get('inputTransport')) || 0; }
+function fmt(n) { return currency() + Number(n || 0).toFixed(2); }
 
-function calculateAllocations() {
-  const lineSubtotals = state.items.map(i => (i.qty || 0) * (i.price || 0));
-  const totalSubtotal = lineSubtotals.reduce((a, b) => a + b, 0);
-  const fee = state.transportFee || 0;
-
+function compute() {
+  const fee = transportFee();
+  const subs = state.items.map(i => (i.qty || 0) * (i.price || 0));
+  const total = subs.reduce((a, b) => a + b, 0);
   return state.items.map((item, idx) => {
-    const lineSubtotal = lineSubtotals[idx];
-    const transportShare = totalSubtotal > 0 ? (lineSubtotal / totalSubtotal) * fee : (fee / (state.items.length || 1));
-    const effectiveTotal = lineSubtotal + transportShare;
-    const effectiveUnitCost = item.qty > 0 ? effectiveTotal / item.qty : 0;
-    return {
-      ...item,
-      lineSubtotal,
-      transportShare,
-      effectiveTotal,
-      effectiveUnitCost
-    };
+    const sub  = subs[idx];
+    const tr   = total > 0 ? (sub / total) * fee : fee / (state.items.length || 1);
+    const eff  = sub + tr;
+    return { ...item, sub, tr, eff, effUnit: item.qty > 0 ? eff / item.qty : 0 };
   });
 }
 
+/* ── Render editor items ──────────────────────────────── */
+function renderItems() {
+  const c = document.getElementById('itemsContainer');
+  c.innerHTML = '';
+  state.items.forEach((item, i) => {
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.innerHTML = `
+      <input type="text"   placeholder="Item description" value="${esc(item.name)}"
+             oninput="updateItem(${i},'name',this.value)">
+      <input type="number" placeholder="Qty"   min="0" step="any"  value="${item.qty}"
+             oninput="updateItem(${i},'qty',this.value)">
+      <input type="number" placeholder="Price" min="0" step="0.01" value="${item.price}"
+             oninput="updateItem(${i},'price',this.value)">
+      <button class="btn-del" title="Remove" onclick="deleteItem(${i})">&#215;</button>
+    `;
+    c.appendChild(row);
+  });
+}
+
+/* ── Render A4 sheet ──────────────────────────────────── */
+function renderA4(sheet, rows, subtotal, grand) {
+  const fromLines = esc(get('inputFrom'));
+  const toLines   = esc(get('inputTo'));
+  const date      = esc(get('inputDate'));
+
+  sheet.className = 'sheet sheet-a4';
+  sheet.innerHTML = `
+    <div class="a4-topbar"></div>
+
+    <div class="a4-header">
+      <div class="a4-header-left">
+        <div class="a4-doc-type">INVOICE</div>
+        <div class="a4-doc-sub">Tax Invoice / Receipt</div>
+      </div>
+      <div class="a4-date-badge">
+        <span>Date</span>
+        <strong>${date}</strong>
+      </div>
+    </div>
+
+    <div class="a4-parties">
+      <div class="a4-party from">
+        <div class="a4-party-label">From &mdash; Supplier</div>
+        <div class="a4-party-name">${fromLines}</div>
+      </div>
+      <div class="a4-party to">
+        <div class="a4-party-label">To &mdash; Customer</div>
+        <div class="a4-party-name">${toLines}</div>
+      </div>
+    </div>
+
+    <table class="a4-table">
+      <thead>
+        <tr>
+          <th style="width:36%">Description</th>
+          <th class="r" style="width:7%">Qty</th>
+          <th class="r" style="width:13%">Unit Price</th>
+          <th class="r" style="width:13%">Subtotal</th>
+          <th class="r" style="width:14%">Transport</th>
+          <th class="r" style="width:17%">Line Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(r => `
+          <tr>
+            <td>
+              <div class="item-name">${esc(r.name || 'Item')}</div>
+              <div class="eff-unit">Eff. unit cost: ${fmt(r.effUnit)}</div>
+            </td>
+            <td class="r">${r.qty}</td>
+            <td class="r">${fmt(r.price)}</td>
+            <td class="r">${fmt(r.sub)}</td>
+            <td class="r transport-share">+${fmt(r.tr)}</td>
+            <td class="r line-total">${fmt(r.eff)}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+
+    <div class="a4-totals-wrap">
+      <div class="a4-totals">
+        <div class="a4-totals-row">
+          <span>Items Subtotal</span>
+          <span>${fmt(subtotal)}</span>
+        </div>
+        <div class="a4-totals-row">
+          <span>Transport Fee</span>
+          <span>${fmt(transportFee())}</span>
+        </div>
+        <div class="a4-totals-row grand">
+          <span>Grand Total</span>
+          <span>${fmt(grand)}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="a4-footer">
+      <span>Generated by Thermal Invoice Maker</span>
+      <span>${date}</span>
+    </div>
+  `;
+}
+
+/* ── Render 79mm thermal sheet ────────────────────────── */
+function render79(sheet, rows, subtotal, grand) {
+  const fromRaw = get('inputFrom').split('\n');
+  const toRaw   = get('inputTo').split('\n');
+  const date    = esc(get('inputDate'));
+
+  sheet.className = 'sheet sheet-79mm';
+  sheet.innerHTML = `
+    <div class="th-center">
+      <div class="th-logo">${esc(fromRaw[0] || 'RECEIPT')}</div>
+      ${fromRaw.slice(1).map(l => `<div class="th-sub">${esc(l)}</div>`).join('')}
+    </div>
+
+    <hr class="th-hr-solid">
+
+    <div class="th-meta">
+      <div class="th-meta-row"><span class="lbl">DATE</span><span class="val">${date}</span></div>
+      <div class="th-meta-row"><span class="lbl">TO</span><span class="val">${esc(get('inputTo').replace(/\n/g, ', '))}</span></div>
+    </div>
+
+    <hr class="th-hr-dash">
+
+    <div class="th-items-head">
+      <span class="th-col-name">ITEM</span>
+      <span class="th-col-qty">QT</span>
+      <span class="th-col-price">PRICE</span>
+      <span class="th-col-total">TOTAL</span>
+    </div>
+
+    ${rows.map(r => `
+      <div class="th-item-block">
+        <div class="th-item-main">
+          <span class="th-item-name">${esc(r.name || 'Item')}</span>
+          <span class="th-item-qty">${r.qty}</span>
+          <span class="th-item-price">${fmt(r.price)}</span>
+          <span class="th-item-total">${fmt(r.eff)}</span>
+        </div>
+        <div class="th-item-meta">+trn: ${fmt(r.tr)} &nbsp;|&nbsp; eff/unit: ${fmt(r.effUnit)}</div>
+      </div>
+    `).join('')}
+
+    <hr class="th-hr-solid">
+
+    <div class="th-totals">
+      <div class="th-totals-row">
+        <span>Items Subtotal</span>
+        <span>${fmt(subtotal)}</span>
+      </div>
+      <div class="th-totals-row">
+        <span>Transport Fee</span>
+        <span>${fmt(transportFee())}</span>
+      </div>
+      <div class="th-totals-row grand">
+        <span>TOTAL</span>
+        <span>${fmt(grand)}</span>
+      </div>
+    </div>
+
+    <hr class="th-hr-dash">
+    <div class="th-footer">** THANK YOU **</div>
+  `;
+}
+
+/* ── Main render ──────────────────────────────────────── */
+function render() {
+  renderItems();
+
+  const rows     = compute();
+  const subtotal = rows.reduce((a, r) => a + r.sub, 0);
+  const grand    = subtotal + transportFee();
+
+  document.getElementById('summarySubtotal').textContent = fmt(subtotal);
+  document.getElementById('summaryTransport').textContent = fmt(transportFee());
+  document.getElementById('summaryGrand').textContent = fmt(grand);
+
+  const sheet = document.getElementById('printSheet');
+  if (state.format === '79mm') render79(sheet, rows, subtotal, grand);
+  else                         renderA4(sheet, rows, subtotal, grand);
+}
+
+/* ── Format switching ─────────────────────────────────── */
 function setFormat(fmt) {
   state.format = fmt;
   document.getElementById('btnFormatA4').classList.toggle('active', fmt === 'a4');
   document.getElementById('btnFormat79').classList.toggle('active', fmt === '79mm');
-  updatePrintPageStyle();
-  renderSheet();
+  setPrintPage();
+  render();
 }
 
-function updatePrintPageStyle() {
-  const styleEl = document.getElementById('dynamic-print-page');
-  if (state.format === '79mm') {
-    // 79mm thermal continuous roll: zero page breaks, exact width
-    styleEl.textContent = `
-      @page {
-        size: 79mm auto;
-        margin: 2mm 2.5mm;
-      }
-      body {
-        margin: 0;
-        padding: 0;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
-      .sheet-79mm {
-        width: 100% !important;
-        margin: 0 !important;
-        box-shadow: none !important;
-      }
-    `;
-  } else {
-    // A4 standard portrait
-    styleEl.textContent = `
-      @page {
-        size: A4 portrait;
-        margin: 12mm 10mm;
-      }
-      body {
-        margin: 0;
-        padding: 0;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
-      .sheet-a4 {
-        width: 100% !important;
-        min-height: auto !important;
-        margin: 0 !important;
-        box-shadow: none !important;
-        padding: 0 !important;
-      }
-    `;
-  }
+function setPrintPage() {
+  document.getElementById('dynamic-print-page').textContent = state.format === '79mm' ? `
+    @page { size: 79mm auto; margin: 2mm 3mm; }
+    @media print {
+      .sheet-79mm { width: 100% !important; box-shadow: none !important; padding: 0 !important; }
+    }
+  ` : `
+    @page { size: A4 portrait; margin: 20mm 18mm; }
+    @media print {
+      .sheet-a4 { width: 100% !important; min-height: auto !important;
+                  box-shadow: none !important; padding: 0 !important; }
+      .a4-topbar { display: none; }
+      .a4-footer { position: static; border-top: 1px solid #e5e7eb;
+                   padding-top: 4mm; margin-top: 6mm; }
+    }
+  `;
 }
 
-function formatMoney(amount) {
-  return `${state.currency}${Number(amount || 0).toFixed(2)}`;
-}
-
-function renderEditorItems() {
-  const container = document.getElementById('itemsContainer');
-  container.innerHTML = '';
-
-  state.items.forEach((item, index) => {
-    const row = document.createElement('div');
-    row.className = 'item-row';
-    row.innerHTML = `
-      <input type="text" placeholder="Item name / desc" value="${escapeHtml(item.name)}" oninput="updateItem(${index}, 'name', this.value)">
-      <input type="number" min="0" step="any" placeholder="Qty" value="${item.qty}" oninput="updateItem(${index}, 'qty', this.value)">
-      <input type="number" min="0" step="0.01" placeholder="Price" value="${item.price}" oninput="updateItem(${index}, 'price', this.value)">
-      <button class="btn btn-danger btn-sm" title="Remove" onclick="deleteItem(${index})">&times;</button>
-    `;
-    container.appendChild(row);
-  });
-}
-
-function renderSheet() {
-  const sheet = document.getElementById('printSheet');
-  const computed = calculateAllocations();
-  const subtotal = computed.reduce((acc, i) => acc + i.lineSubtotal, 0);
-  const grandTotal = subtotal + state.transportFee;
-
-  // Update summary sidebar
-  document.getElementById('summarySubtotal').textContent = formatMoney(subtotal);
-  document.getElementById('summaryTransport').textContent = formatMoney(state.transportFee);
-  document.getElementById('summaryGrand').textContent = formatMoney(grandTotal);
-
-  if (state.format === '79mm') {
-    sheet.className = 'sheet sheet-79mm';
-    sheet.innerHTML = `
-      <div class="receipt-header">
-        <div class="receipt-title">RECEIPT</div>
-        <div style="font-size:10px; margin-top:2px;">${escapeHtml(state.from.split('\\n')[0] || '')}</div>
-      </div>
-      <div class="divider"></div>
-      <div class="meta-section">
-        <div class="meta-row"><span>DATE:</span><span>${escapeHtml(state.date)}</span></div>
-        <div class="meta-row"><span>FROM:</span><span style="text-align:right;">${escapeHtml(state.from).replace(/\\n/g, '<br>')}</span></div>
-        <div class="meta-row"><span>TO:</span><span style="text-align:right;">${escapeHtml(state.to).replace(/\\n/g, '<br>')}</span></div>
-      </div>
-      <div class="divider"></div>
-      <table class="items-table">
-        <thead>
-          <tr>
-            <th>ITEM</th>
-            <th class="text-right">QTY</th>
-            <th class="text-right">PRICE</th>
-            <th class="text-right">TOTAL</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${computed.map(i => `
-            <tr>
-              <td colspan="4" style="font-weight:700; padding-top:4px;">${escapeHtml(i.name || 'Item')}</td>
-            </tr>
-            <tr>
-              <td class="item-transport-note">+tr: ${formatMoney(i.transportShare)}</td>
-              <td class="text-right">${i.qty}</td>
-              <td class="text-right">${formatMoney(i.price)}</td>
-              <td class="text-right" style="font-weight:700;">${formatMoney(i.effectiveTotal)}</td>
-            </tr>
-            <tr>
-              <td colspan="4" class="item-transport-note" style="border-bottom:1px dotted #ccc; padding-bottom:3px;">
-                Eff. unit cost: ${formatMoney(i.effectiveUnitCost)}
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-      <div class="divider"></div>
-      <div class="totals-block">
-        <div class="totals-row">
-          <span>Items Subtotal:</span>
-          <span>${formatMoney(subtotal)}</span>
-        </div>
-        <div class="totals-row">
-          <span>Transport Fee:</span>
-          <span>${formatMoney(state.transportFee)}</span>
-        </div>
-        <div class="totals-row grand">
-          <span>TOTAL:</span>
-          <span>${formatMoney(grandTotal)}</span>
-        </div>
-      </div>
-      <div class="footer-note">*** THANK YOU ***</div>
-    `;
-  } else {
-    sheet.className = 'sheet sheet-a4';
-    sheet.innerHTML = `
-      <div class="invoice-title">INVOICE</div>
-      <div class="meta-grid">
-        <div class="meta-block">
-          <h4>From (Supplier)</h4>
-          <p>${escapeHtml(state.from)}</p>
-        </div>
-        <div class="meta-block">
-          <h4>To (Customer)</h4>
-          <p>${escapeHtml(state.to)}</p>
-        </div>
-        <div class="meta-block">
-          <h4>Date</h4>
-          <p>${escapeHtml(state.date)}</p>
-        </div>
-      </div>
-
-      <table>
-        <thead>
-          <tr>
-            <th style="width: 32%;">Item Description</th>
-            <th class="text-right" style="width: 10%;">Qty</th>
-            <th class="text-right" style="width: 14%;">Unit Price</th>
-            <th class="text-right" style="width: 14%;">Subtotal</th>
-            <th class="text-right" style="width: 15%;">Transport Share</th>
-            <th class="text-right" style="width: 15%;">Line Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${computed.map(i => `
-            <tr>
-              <td>
-                <strong>${escapeHtml(i.name || 'Item')}</strong>
-                <div style="font-size:11px; color:#64748b;">Eff. unit cost: ${formatMoney(i.effectiveUnitCost)}</div>
-              </td>
-              <td class="text-right">${i.qty}</td>
-              <td class="text-right">${formatMoney(i.price)}</td>
-              <td class="text-right">${formatMoney(i.lineSubtotal)}</td>
-              <td class="text-right" style="color:#2563eb;">+${formatMoney(i.transportShare)}</td>
-              <td class="text-right"><strong>${formatMoney(i.effectiveTotal)}</strong></td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-
-      <div class="totals-area">
-        <table class="totals-table">
-          <tr>
-            <td>Items Subtotal:</td>
-            <td class="text-right"><strong>${formatMoney(subtotal)}</strong></td>
-          </tr>
-          <tr>
-            <td>Transport Fee (Allocated):</td>
-            <td class="text-right"><strong>${formatMoney(state.transportFee)}</strong></td>
-          </tr>
-          <tr class="grand-total-row">
-            <td>Grand Total:</td>
-            <td class="text-right">${formatMoney(grandTotal)}</td>
-          </tr>
-        </table>
-      </div>
-    `;
-  }
-}
-
-function render() {
-  renderEditorItems();
-  updatePrintPageStyle();
-  renderSheet();
-}
-
-function triggerPrint() {
-  updatePrintPageStyle();
-  window.print();
-}
+/* ── Print / PDF ──────────────────────────────────────── */
+function triggerPrint() { setPrintPage(); window.print(); }
 
 function downloadPdf() {
-  const sheet = document.getElementById('printSheet');
-  const isThermal = state.format === '79mm';
-  
-  const opt = {
-    margin: isThermal ? [2, 2, 2, 2] : [10, 10, 10, 10],
-    filename: `invoice-${state.date}-${state.format}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
-    jsPDF: {
-      unit: 'mm',
-      format: isThermal ? [79, Math.max(120, sheet.offsetHeight * 0.264583 + 10)] : 'a4',
-      orientation: 'portrait'
-    }
-  };
-
-  html2pdf().set(opt).from(sheet).save();
+  const sheet    = document.getElementById('printSheet');
+  const thermal  = state.format === '79mm';
+  const height   = thermal ? Math.max(120, sheet.scrollHeight * 0.2646 + 8) : undefined;
+  html2pdf().set({
+    margin:     thermal ? [2, 3] : [20, 18],
+    filename:   `invoice-${get('inputDate')}-${state.format}.pdf`,
+    image:      { type: 'jpeg', quality: 0.97 },
+    html2canvas:{ scale: 2.5, useCORS: true, logging: false },
+    jsPDF:      { unit: 'mm', format: thermal ? [79, height] : 'a4', orientation: 'portrait' }
+  }).from(sheet).save();
 }
 
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+/* ── Util ─────────────────────────────────────────────── */
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+setPrintPage();
 init();
 </script>
 </body>
