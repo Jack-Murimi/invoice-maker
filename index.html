@@ -490,6 +490,8 @@ body {
   /* prevent ANY child from escaping the roll width */
   overflow: hidden;
   word-break: break-word;
+  /* min-height gives blank space at bottom for paper-punch filing */
+  min-height: 120mm;
 }
 
 .th-center { text-align: center; }
@@ -534,7 +536,7 @@ body {
 }
 .th-tbl .col-name  { width: auto; }
 .th-tbl .col-qty   { width: 22px;  text-align: right; white-space: nowrap; }
-.th-tbl .col-total { width: 72px; text-align: right; white-space: nowrap; font-weight: 700; }
+.th-tbl .col-total { width: 72px; text-align: right; white-space: normal; word-break: break-word; font-weight: 700; }
 
 .th-tbl thead th {
   font-size: 7pt;
@@ -571,7 +573,7 @@ body {
 }
 .th-totals-tbl td { padding: 1.5px 2px; }
 .th-totals-tbl .td-label { text-align: left; }
-.th-totals-tbl .td-value { text-align: right; font-weight: 700; white-space: nowrap; }
+.th-totals-tbl .td-value { text-align: right; font-weight: 700; white-space: normal; word-break: break-word; }
 .th-totals-tbl .tr-grand td {
   font-size: 10.5pt;
   font-weight: 900;
@@ -769,7 +771,12 @@ function updateItem(i, field, val) {
 function get(id) { return document.getElementById(id).value; }
 function currency() { return get('inputCurrency') || '$'; }
 function transportFee() { return parseFloat(get('inputTransport')) || 0; }
-function fmt(n) { return currency() + Number(n || 0).toFixed(2); }
+function fmt(n) {
+  const v = Number(n || 0).toFixed(2);
+  // add thousands separators to integer part
+  const [int, dec] = v.split('.');
+  return currency() + int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + dec;
+}
 
 function compute() {
   const fee = transportFee();
