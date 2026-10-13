@@ -118,31 +118,6 @@ body {
 .form-row3 { display: grid; grid-template-columns: 1fr 0.55fr 0.55fr; gap: 0.6rem; }
 
 /* Price mode toggle */
-.price-mode-toggle {
-  display: flex;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  overflow: hidden;
-  height: 100%;
-}
-.price-mode-toggle button {
-  flex: 1;
-  border: none;
-  background: #fafbfc;
-  color: var(--muted);
-  font-size: 9px;
-  font-weight: 700;
-  cursor: pointer;
-  padding: 2px 3px;
-  line-height: 1.2;
-  transition: background 0.1s, color 0.1s;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-.price-mode-toggle button.active {
-  background: var(--accent);
-  color: #fff;
-}
 
 /* Items */
 .items-header {
@@ -163,7 +138,7 @@ body {
 
 .item-col-labels {
   display: grid;
-  grid-template-columns: 1fr 50px 44px 76px 30px;
+  grid-template-columns: 1fr 46px 72px 72px 30px;
   gap: 4px;
   padding: 0 0 3px;
   font-size: 10px;
@@ -178,7 +153,7 @@ body {
 
 .item-row {
   display: grid;
-  grid-template-columns: 1fr 50px 44px 76px 30px;
+  grid-template-columns: 1fr 46px 72px 72px 30px;
   gap: 4px;
   align-items: center;
   margin-bottom: 4px;
@@ -683,8 +658,8 @@ Attn: Receiving Dept</textarea>
     <div class="item-col-labels">
       <span>Description</span>
       <span>Qty</span>
-      <span>Mode</span>
-      <span>Price</span>
+      <span>Unit Price</span>
+      <span>Total Price</span>
       <span></span>
     </div>
 
@@ -734,9 +709,7 @@ Attn: Receiving Dept</textarea>
 const state = {
   format: 'a4',
   items: [
-    { name: 'Industrial Motor 5HP',      qty: 2, price: 45000.00, priceMode: 'unit' },
-    { name: 'Steel Bearings pack (10x)', qty: 5, price:  3200.00, priceMode: 'unit' },
-    { name: 'Synthetic Gear Oil 5L',     qty: 1, price:  5500.00, priceMode: 'unit' }
+    { name: '', qty: 1, unitPrice: 0, totalPrice: 0 }
   ]
 };
 
@@ -770,7 +743,12 @@ function loadFromStorage() {
     if (d.date)         document.getElementById('inputDate').value = d.date;
     if (d.currency)     document.getElementById('inputCurrency').value = d.currency;
     if (d.transportFee !== undefined) document.getElementById('inputTransport').value = d.transportFee;
-    if (Array.isArray(d.items) && d.items.length) state.items = d.items.map(it => ({ priceMode: 'unit', ...it }));
+    if (Array.isArray(d.items) && d.items.length) state.items = d.items.map(it => {
+      const unitPrice  = it.unitPrice  ?? it.price ?? 0;
+      const qty        = it.qty || 0;
+      const totalPrice = it.totalPrice ?? (unitPrice * qty);
+      return { name: it.name || '', qty, unitPrice, totalPrice };
+    });
   } catch (_) {}
 }
 
@@ -780,20 +758,35 @@ function bindEvents() {
     document.getElementById(id).addEventListener('input', () => { save(); render(true); })
   );
   document.getElementById('btnAddItem').addEventListener('click', () => {
-    state.items.push({ name: '', qty: 1, price: 0, priceMode: 'unit' });
+    state.items.push({ name: '', qty: 1, unitPrice: 0, totalPrice: 0 });
     save(); render();
   });
 }
 function deleteItem(i) {
   state.items.splice(i, 1);
-  if (!state.items.length) state.items.push({ name: '', qty: 1, price: 0, priceMode: 'unit' });
+  if (!state.items.length) state.items.push({ name: '', qty: 1, unitPrice: 0, totalPrice: 0 });
   save(); render();
 }
 function updateItem(i, field, val) {
-  if (field === 'qty')        state.items[i].qty       = Math.max(0, parseFloat(val) || 0);
-  else if (field === 'price') state.items[i].price     = Math.max(0, parseFloat(val) || 0);
-  else if (field === 'mode')  { state.items[i].priceMode = val; save(); render(); return; }
-  else                        state.items[i].name      = val;
+  const item = state.items[i];
+  if (field === 'qty') {
+    item.qty = Math.max(0, parseFloat(val) || 0);
+    item.totalPrice = item.unitPrice * item.qty;
+    const tp = document.getElementById('tp_' + i);
+    if (tp && document.activeElement !== tp) tp.value = item.totalPrice > 0 ? item.totalPrice.toFixed(2) : '';
+  } else if (field === 'unitPrice') {
+    item.unitPrice  = Math.max(0, parseFloat(val) || 0);
+    item.totalPrice = item.unitPrice * (item.qty || 0);
+    const tp = document.getElementById('tp_' + i);
+    if (tp) tp.value = item.totalPrice > 0 ? item.totalPrice.toFixed(2) : '';
+  } else if (field === 'totalPrice') {
+    item.totalPrice = Math.max(0, parseFloat(val) || 0);
+    item.unitPrice  = item.qty > 0 ? item.totalPrice / item.qty : 0;
+    const up = document.getElementById('up_' + i);
+    if (up) up.value = item.unitPrice > 0 ? item.unitPrice.toFixed(2) : '';
+  } else {
+    item.name = val;
+  }
   save(); render(true);
 }
 
@@ -811,10 +804,8 @@ function fmt(n) {
 function compute() {
   const fee = transportFee();
   const rows = state.items.map(item => {
-    const mode     = item.priceMode || 'unit';
-    const qty      = item.qty || 0;
-    const rawPrice = item.price || 0;
-    const unitPrice = mode === 'total' ? (qty > 0 ? rawPrice / qty : 0) : rawPrice;
+    const qty       = item.qty || 0;
+    const unitPrice = item.unitPrice || 0;
     const sub       = unitPrice * qty;
     return { ...item, unitPrice, sub };
   });
@@ -831,21 +822,19 @@ function renderItems() {
   const c = document.getElementById('itemsContainer');
   c.innerHTML = '';
   state.items.forEach((item, i) => {
-    const mode = item.priceMode || 'unit';
-    const placeholder = mode === 'total' ? 'Total Price' : 'Unit Price';
     const row = document.createElement('div');
     row.className = 'item-row';
+    const uVal = item.unitPrice  > 0 ? item.unitPrice  : '';
+    const tVal = item.totalPrice > 0 ? item.totalPrice : '';
     row.innerHTML = `
       <input type="text"   placeholder="Item description" value="${esc(item.name)}"
              oninput="updateItem(${i},'name',this.value)">
-      <input type="number" placeholder="Qty"   min="0" step="any"  value="${item.qty}"
+      <input type="number" placeholder="Qty" min="0" step="any" value="${item.qty || ''}"
              oninput="updateItem(${i},'qty',this.value)">
-      <div class="price-mode-toggle">
-        <button onclick="updateItem(${i},'mode','unit')"  class="${mode==='unit'?'active':''}" title="Enter unit price">U</button>
-        <button onclick="updateItem(${i},'mode','total')" class="${mode==='total'?'active':''}" title="Enter total price">T</button>
-      </div>
-      <input type="number" placeholder="${placeholder}" min="0" step="0.01" value="${item.price}"
-             oninput="updateItem(${i},'price',this.value)">
+      <input type="number" placeholder="Unit" min="0" step="0.01" value="${uVal}"
+             oninput="updateItem(${i},'unitPrice',this.value)" id="up_${i}">
+      <input type="number" placeholder="Total" min="0" step="0.01" value="${tVal}"
+             oninput="updateItem(${i},'totalPrice',this.value)" id="tp_${i}">
       <button class="btn-del" title="Remove" onclick="deleteItem(${i})">&#215;</button>
     `;
     c.appendChild(row);
