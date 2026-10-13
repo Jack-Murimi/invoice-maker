@@ -117,6 +117,33 @@ body {
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
 .form-row3 { display: grid; grid-template-columns: 1fr 0.55fr 0.55fr; gap: 0.6rem; }
 
+/* Price mode toggle */
+.price-mode-toggle {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  height: 100%;
+}
+.price-mode-toggle button {
+  flex: 1;
+  border: none;
+  background: #fafbfc;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 3px;
+  line-height: 1.2;
+  transition: background 0.1s, color 0.1s;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.price-mode-toggle button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
 /* Items */
 .items-header {
   display: flex;
@@ -136,7 +163,7 @@ body {
 
 .item-col-labels {
   display: grid;
-  grid-template-columns: 1fr 56px 80px 30px;
+  grid-template-columns: 1fr 50px 44px 76px 30px;
   gap: 4px;
   padding: 0 0 3px;
   font-size: 10px;
@@ -146,11 +173,12 @@ body {
   letter-spacing: 0.4px;
 }
 .item-col-labels span:nth-child(2),
-.item-col-labels span:nth-child(3) { text-align: center; }
+.item-col-labels span:nth-child(3),
+.item-col-labels span:nth-child(4) { text-align: center; }
 
 .item-row {
   display: grid;
-  grid-template-columns: 1fr 56px 80px 30px;
+  grid-template-columns: 1fr 50px 44px 76px 30px;
   gap: 4px;
   align-items: center;
   margin-bottom: 4px;
@@ -655,7 +683,8 @@ Attn: Receiving Dept</textarea>
     <div class="item-col-labels">
       <span>Description</span>
       <span>Qty</span>
-      <span>Unit Price</span>
+      <span>Mode</span>
+      <span>Price</span>
       <span></span>
     </div>
 
@@ -705,9 +734,9 @@ Attn: Receiving Dept</textarea>
 const state = {
   format: 'a4',
   items: [
-    { name: 'Industrial Motor 5HP',      qty: 2, price: 45000.00 },
-    { name: 'Steel Bearings pack (10x)', qty: 5, price:  3200.00 },
-    { name: 'Synthetic Gear Oil 5L',     qty: 1, price:  5500.00 }
+    { name: 'Industrial Motor 5HP',      qty: 2, price: 45000.00, priceMode: 'unit' },
+    { name: 'Steel Bearings pack (10x)', qty: 5, price:  3200.00, priceMode: 'unit' },
+    { name: 'Synthetic Gear Oil 5L',     qty: 1, price:  5500.00, priceMode: 'unit' }
   ]
 };
 
@@ -741,30 +770,31 @@ function loadFromStorage() {
     if (d.date)         document.getElementById('inputDate').value = d.date;
     if (d.currency)     document.getElementById('inputCurrency').value = d.currency;
     if (d.transportFee !== undefined) document.getElementById('inputTransport').value = d.transportFee;
-    if (Array.isArray(d.items) && d.items.length) state.items = d.items;
+    if (Array.isArray(d.items) && d.items.length) state.items = d.items.map(it => ({ priceMode: 'unit', ...it }));
   } catch (_) {}
 }
 
 /* ── Events ───────────────────────────────────────────── */
 function bindEvents() {
   ['inputFrom','inputTo','inputDate','inputCurrency','inputTransport'].forEach(id =>
-    document.getElementById(id).addEventListener('input', () => { save(); render(); })
+    document.getElementById(id).addEventListener('input', () => { save(); render(true); })
   );
   document.getElementById('btnAddItem').addEventListener('click', () => {
-    state.items.push({ name: '', qty: 1, price: 0 });
+    state.items.push({ name: '', qty: 1, price: 0, priceMode: 'unit' });
     save(); render();
   });
 }
 function deleteItem(i) {
   state.items.splice(i, 1);
-  if (!state.items.length) state.items.push({ name: '', qty: 1, price: 0 });
+  if (!state.items.length) state.items.push({ name: '', qty: 1, price: 0, priceMode: 'unit' });
   save(); render();
 }
 function updateItem(i, field, val) {
-  if (field === 'qty')   state.items[i].qty   = Math.max(0, parseFloat(val) || 0);
-  else if (field === 'price') state.items[i].price = Math.max(0, parseFloat(val) || 0);
-  else state.items[i].name = val;
-  save(); render();
+  if (field === 'qty')        state.items[i].qty       = Math.max(0, parseFloat(val) || 0);
+  else if (field === 'price') state.items[i].price     = Math.max(0, parseFloat(val) || 0);
+  else if (field === 'mode')  { state.items[i].priceMode = val; save(); render(); return; }
+  else                        state.items[i].name      = val;
+  save(); render(true);
 }
 
 /* ── Calculations ─────────────────────────────────────── */
@@ -780,13 +810,19 @@ function fmt(n) {
 
 function compute() {
   const fee = transportFee();
-  const subs = state.items.map(i => (i.qty || 0) * (i.price || 0));
-  const total = subs.reduce((a, b) => a + b, 0);
-  return state.items.map((item, idx) => {
-    const sub  = subs[idx];
-    const tr   = total > 0 ? (sub / total) * fee : fee / (state.items.length || 1);
-    const eff  = sub + tr;
-    return { ...item, sub, tr, eff, effUnit: item.qty > 0 ? eff / item.qty : 0 };
+  const rows = state.items.map(item => {
+    const mode     = item.priceMode || 'unit';
+    const qty      = item.qty || 0;
+    const rawPrice = item.price || 0;
+    const unitPrice = mode === 'total' ? (qty > 0 ? rawPrice / qty : 0) : rawPrice;
+    const sub       = unitPrice * qty;
+    return { ...item, unitPrice, sub };
+  });
+  const total = rows.reduce((a, r) => a + r.sub, 0);
+  return rows.map(r => {
+    const tr  = total > 0 ? (r.sub / total) * fee : fee / (rows.length || 1);
+    const eff = r.sub + tr;
+    return { ...r, tr, eff, effUnit: r.qty > 0 ? eff / r.qty : 0 };
   });
 }
 
@@ -795,6 +831,8 @@ function renderItems() {
   const c = document.getElementById('itemsContainer');
   c.innerHTML = '';
   state.items.forEach((item, i) => {
+    const mode = item.priceMode || 'unit';
+    const placeholder = mode === 'total' ? 'Total Price' : 'Unit Price';
     const row = document.createElement('div');
     row.className = 'item-row';
     row.innerHTML = `
@@ -802,7 +840,11 @@ function renderItems() {
              oninput="updateItem(${i},'name',this.value)">
       <input type="number" placeholder="Qty"   min="0" step="any"  value="${item.qty}"
              oninput="updateItem(${i},'qty',this.value)">
-      <input type="number" placeholder="Price" min="0" step="0.01" value="${item.price}"
+      <div class="price-mode-toggle">
+        <button onclick="updateItem(${i},'mode','unit')"  class="${mode==='unit'?'active':''}" title="Enter unit price">U</button>
+        <button onclick="updateItem(${i},'mode','total')" class="${mode==='total'?'active':''}" title="Enter total price">T</button>
+      </div>
+      <input type="number" placeholder="${placeholder}" min="0" step="0.01" value="${item.price}"
              oninput="updateItem(${i},'price',this.value)">
       <button class="btn-del" title="Remove" onclick="deleteItem(${i})">&#215;</button>
     `;
@@ -861,7 +903,7 @@ function renderA4(sheet, rows, subtotal, grand) {
               <div class="eff-unit">Eff. unit cost: ${fmt(r.effUnit)}</div>
             </td>
             <td class="r">${r.qty}</td>
-            <td class="r">${fmt(r.price)}</td>
+            <td class="r">${fmt(r.unitPrice)}</td>
             <td class="r">${fmt(r.sub)}</td>
             <td class="r transport-share">+${fmt(r.tr)}</td>
             <td class="r line-total">${fmt(r.eff)}</td>
@@ -932,7 +974,7 @@ function render79(sheet, rows, subtotal, grand) {
           </tr>
           <tr>
             <td class="td-sub" colspan="3">
-              @${fmt(r.price)} &nbsp;+trn:${fmt(r.tr)} &nbsp;eff/u:${fmt(r.effUnit)}
+              @${fmt(r.unitPrice)} &nbsp;+trn:${fmt(r.tr)} &nbsp;eff/u:${fmt(r.effUnit)}
             </td>
           </tr>
         `).join('')}
@@ -962,8 +1004,8 @@ function render79(sheet, rows, subtotal, grand) {
 }
 
 /* ── Main render ──────────────────────────────────────── */
-function render() {
-  renderItems();
+function render(skipItemsDom) {
+  if (!skipItemsDom) renderItems();
 
   const rows     = compute();
   const subtotal = rows.reduce((a, r) => a + r.sub, 0);
