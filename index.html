@@ -36,24 +36,24 @@ body {
   background: var(--ink);
   color: #fff;
   padding: 0 1.5rem;
-  height: 52px;
+  height: 36px;
   display: flex;
   align-items: center;
   gap: 0.6rem;
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 0.85rem;
   letter-spacing: -0.2px;
   border-bottom: 1px solid #2d3748;
   position: sticky;
   top: 0;
   z-index: 100;
 }
-.app-header .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block; }
+.app-header .logo-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: inline-block; }
 
 .app-body {
   display: grid;
   grid-template-columns: 520px 1fr;
-  height: calc(100vh - 52px);
+  height: calc(100vh - 36px);
 }
 @media (max-width: 1024px) {
   .app-body { grid-template-columns: 420px 1fr; }
