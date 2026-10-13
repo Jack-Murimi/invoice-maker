@@ -671,7 +671,7 @@ Attn: Receiving Dept</textarea>
         <span>Items Subtotal</span>
         <strong id="summarySubtotal">$0.00</strong>
       </div>
-      <div class="summary-row">
+      <div class="summary-row" id="summaryTransportRow">
         <span>Transport Fee</span>
         <strong id="summaryTransport">$0.00</strong>
       </div>
@@ -846,6 +846,8 @@ function renderA4(sheet, rows, subtotal, grand) {
   const fromLines = esc(get('inputFrom'));
   const toLines   = esc(get('inputTo'));
   const date      = esc(get('inputDate'));
+  const fee       = transportFee();
+  const hasTr     = fee > 0;
 
   sheet.className = 'sheet sheet-a4';
   sheet.innerHTML = `
@@ -880,8 +882,8 @@ function renderA4(sheet, rows, subtotal, grand) {
           <th class="r" style="width:7%">Qty</th>
           <th class="r" style="width:13%">Unit Price</th>
           <th class="r" style="width:13%">Subtotal</th>
-          <th class="r" style="width:14%">Transport</th>
-          <th class="r" style="width:17%">Line Total</th>
+          ${hasTr ? `<th class="r" style="width:14%">Transport</th>
+          <th class="r" style="width:17%">Line Total</th>` : `<th class="r" style="width:31%">Total</th>`}
         </tr>
       </thead>
       <tbody>
@@ -889,13 +891,13 @@ function renderA4(sheet, rows, subtotal, grand) {
           <tr>
             <td>
               <div class="item-name">${esc(r.name || 'Item')}</div>
-              <div class="eff-unit">Eff. unit cost: ${fmt(r.effUnit)}</div>
+              ${hasTr ? `<div class="eff-unit">Eff. unit cost: ${fmt(r.effUnit)}</div>` : ''}
             </td>
             <td class="r">${r.qty}</td>
             <td class="r">${fmt(r.unitPrice)}</td>
             <td class="r">${fmt(r.sub)}</td>
-            <td class="r transport-share">+${fmt(r.tr)}</td>
-            <td class="r line-total">${fmt(r.eff)}</td>
+            ${hasTr ? `<td class="r transport-share">+${fmt(r.tr)}</td>
+            <td class="r line-total">${fmt(r.eff)}</td>` : `<td class="r line-total">${fmt(r.sub)}</td>`}
           </tr>
         `).join('')}
       </tbody>
@@ -903,14 +905,14 @@ function renderA4(sheet, rows, subtotal, grand) {
 
     <div class="a4-totals-wrap">
       <div class="a4-totals">
-        <div class="a4-totals-row">
+        ${hasTr ? `<div class="a4-totals-row">
           <span>Items Subtotal</span>
           <span>${fmt(subtotal)}</span>
         </div>
         <div class="a4-totals-row">
           <span>Transport Fee</span>
-          <span>${fmt(transportFee())}</span>
-        </div>
+          <span>${fmt(fee)}</span>
+        </div>` : ''}
         <div class="a4-totals-row grand">
           <span>Grand Total</span>
           <span>${fmt(grand)}</span>
@@ -929,6 +931,8 @@ function renderA4(sheet, rows, subtotal, grand) {
 function render79(sheet, rows, subtotal, grand) {
   const fromRaw = get('inputFrom').split('\n');
   const date    = esc(get('inputDate'));
+  const fee     = transportFee();
+  const hasTr   = fee > 0;
 
   sheet.className = 'sheet sheet-79mm';
   sheet.innerHTML = `
@@ -959,11 +963,11 @@ function render79(sheet, rows, subtotal, grand) {
           <tr>
             <td class="td-name col-name">${esc(r.name || 'Item')}</td>
             <td class="col-qty">${r.qty}</td>
-            <td class="col-total">${fmt(r.eff)}</td>
+            <td class="col-total">${fmt(hasTr ? r.eff : r.sub)}</td>
           </tr>
           <tr>
             <td class="td-sub" colspan="3">
-              @${fmt(r.unitPrice)} &nbsp;+trn:${fmt(r.tr)} &nbsp;eff/u:${fmt(r.effUnit)}
+              @${fmt(r.unitPrice)}${hasTr ? ` &nbsp;+trn:${fmt(r.tr)} &nbsp;eff/u:${fmt(r.effUnit)}` : ''}
             </td>
           </tr>
         `).join('')}
@@ -973,14 +977,14 @@ function render79(sheet, rows, subtotal, grand) {
     <hr class="th-hr-solid">
 
     <table class="th-totals-tbl">
-      <tr>
+      ${hasTr ? `<tr>
         <td class="td-label">Items Subtotal</td>
         <td class="td-value">${fmt(subtotal)}</td>
       </tr>
       <tr>
         <td class="td-label">Transport Fee</td>
-        <td class="td-value">${fmt(transportFee())}</td>
-      </tr>
+        <td class="td-value">${fmt(fee)}</td>
+      </tr>` : ''}
       <tr class="tr-grand">
         <td class="td-label">TOTAL</td>
         <td class="td-value">${fmt(grand)}</td>
@@ -997,12 +1001,14 @@ function render(skipItemsDom) {
   if (!skipItemsDom) renderItems();
 
   const rows     = compute();
+  const fee      = transportFee();
   const subtotal = rows.reduce((a, r) => a + r.sub, 0);
-  const grand    = subtotal + transportFee();
+  const grand    = subtotal + fee;
 
   document.getElementById('summarySubtotal').textContent = fmt(subtotal);
-  document.getElementById('summaryTransport').textContent = fmt(transportFee());
+  document.getElementById('summaryTransport').textContent = fmt(fee);
   document.getElementById('summaryGrand').textContent = fmt(grand);
+  document.getElementById('summaryTransportRow').style.display = fee > 0 ? '' : 'none';
 
   const sheet = document.getElementById('printSheet');
   if (state.format === '79mm') render79(sheet, rows, subtotal, grand);
